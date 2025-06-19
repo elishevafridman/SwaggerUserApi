@@ -7,25 +7,16 @@ namespace Swagger_Demo.Controllers
     [Route("[controller]")]
     public class UserController : ControllerBase
     {
-        // רשימת המשתמשים – מדמה בסיס נתונים זמני בזיכרון
         private static readonly List<StoredUser> users = new();
 
-        // יצירת משתמש חדש
         [HttpPost]
-        [ProducesResponseType(typeof(UserResponse), 200)]
-        [ProducesResponseType(400)]
         public IActionResult CreateUser([FromBody] User user)
         {
             if (!ModelState.IsValid)
-                return BadRequest(ModelState);
+                throw new Exception("Invalid user input");
 
             if (users.Any(u => u.Email.Equals(user.Email, StringComparison.OrdinalIgnoreCase)))
-            {
-                return BadRequest(new
-                {
-                    message = $"User with email '{user.Email}' already exists"
-                });
-            }
+                throw new Exception($"User with email '{user.Email}' already exists");
 
             var newUser = new StoredUser
             {
@@ -45,36 +36,24 @@ namespace Swagger_Demo.Controllers
             return Ok(response);
         }
 
-        // קבלת כל המשתמשים
         [HttpGet]
-        [ProducesResponseType(typeof(IEnumerable<StoredUser>), 200)]
         public IActionResult GetUsers()
         {
             return Ok(users);
         }
 
-        // עדכון משתמש לפי ID
         [HttpPut("{id}")]
-        [ProducesResponseType(typeof(string), 200)]
-        [ProducesResponseType(404)]
-        [ProducesResponseType(400)]
         public IActionResult UpdateUser(string id, [FromBody] User user)
         {
             if (!ModelState.IsValid)
-                return BadRequest(ModelState);
+                throw new Exception("Invalid user input");
 
             var existingUser = users.FirstOrDefault(u => u.Id == id);
             if (existingUser == null)
-                return NotFound($"User with ID {id} not found");
+                throw new Exception($"User with ID '{id}' not found");
 
-            // בדיקת אימייל כפול – למשתמשים אחרים בלבד
             if (users.Any(u => u.Email.Equals(user.Email, StringComparison.OrdinalIgnoreCase) && u.Id != id))
-            {
-                return BadRequest(new
-                {
-                    message = $"Another user with email '{user.Email}' already exists"
-                });
-            }
+                throw new Exception($"Another user with email '{user.Email}' already exists");
 
             existingUser.Name = user.Name;
             existingUser.Email = user.Email;
@@ -82,15 +61,12 @@ namespace Swagger_Demo.Controllers
             return Ok($"User {id} updated successfully");
         }
 
-        // מחיקת משתמש לפי ID
         [HttpDelete("{id}")]
-        [ProducesResponseType(typeof(string), 200)]
-        [ProducesResponseType(404)]
         public IActionResult DeleteUser(string id)
         {
             var userToRemove = users.FirstOrDefault(u => u.Id == id);
             if (userToRemove == null)
-                return NotFound($"User with ID {id} not found");
+                throw new Exception($"User with ID '{id}' not found");
 
             users.Remove(userToRemove);
             return Ok($"User {id} deleted successfully");
