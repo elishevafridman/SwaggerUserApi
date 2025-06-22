@@ -1,6 +1,8 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Swagger_Demo.Models;
+using Swagger_Demo.Examples;
 using Swashbuckle.AspNetCore.Annotations;
+using Swashbuckle.AspNetCore.Filters;
 
 namespace Swagger_Demo.Controllers
 {
@@ -11,12 +13,13 @@ namespace Swagger_Demo.Controllers
     {
         private static readonly List<StoredUser> users = new();
 
+        // POST: Create new user
         [HttpPost]
-        [SwaggerOperation(
-            Summary = "Create a new user",
-            Description = "Creates a user with name and email, and returns success message",
-            Tags = new[] { "Users" })]
+        [SwaggerOperation(Summary = "Create a new user", Tags = new[] { "Users" })]
         [ProducesResponseType(typeof(UserResponse), 200)]
+        [SwaggerResponseExample(200, typeof(UserResponseExample))]
+        [ProducesResponseType(typeof(ErrorResponse), 400)]
+        [SwaggerResponseExample(400, typeof(ErrorResponseExample))]
         public IActionResult CreateUser([FromBody] User user)
         {
             if (!ModelState.IsValid)
@@ -34,32 +37,31 @@ namespace Swagger_Demo.Controllers
 
             users.Add(newUser);
 
-            var response = new UserResponse
+            return Ok(new UserResponse
             {
                 Id = newUser.Id,
                 Message = $"User {user.Name} created successfully"
-            };
-
-            return Ok(response);
+            });
         }
 
+        // GET: Get all users
         [HttpGet]
-        [SwaggerOperation(
-            Summary = "Get all users",
-            Description = "Returns a list of all registered users",
-            Tags = new[] { "Users" })]
+        [SwaggerOperation(Summary = "Get all users", Tags = new[] { "Users" })]
         [ProducesResponseType(typeof(IEnumerable<StoredUser>), 200)]
+        [SwaggerResponseExample(200, typeof(UserListExample))]
         public IActionResult GetUsers()
         {
             return Ok(users);
         }
 
+        // PUT: Update user by ID
         [HttpPut("{id}")]
-        [SwaggerOperation(
-            Summary = "Update user by ID",
-            Description = "Updates an existing user with the given ID",
-            Tags = new[] { "Users" })]
+        [SwaggerOperation(Summary = "Update user by ID", Tags = new[] { "Users" })]
         [ProducesResponseType(typeof(string), 200)]
+        [ProducesResponseType(typeof(ErrorResponse), 400)]
+        [SwaggerResponseExample(400, typeof(ErrorResponseExample))]
+        [ProducesResponseType(typeof(ErrorResponse), 404)]
+        [SwaggerResponseExample(404, typeof(ErrorResponseExample))]
         public IActionResult UpdateUser(string id, [FromBody] User user)
         {
             if (!ModelState.IsValid)
@@ -78,12 +80,12 @@ namespace Swagger_Demo.Controllers
             return Ok($"User {id} updated successfully");
         }
 
+        // DELETE: Delete user by ID
         [HttpDelete("{id}")]
-        [SwaggerOperation(
-            Summary = "Delete user by ID",
-            Description = "Removes a user by their unique identifier",
-            Tags = new[] { "Users" })]
+        [SwaggerOperation(Summary = "Delete user by ID", Tags = new[] { "Users" })]
         [ProducesResponseType(typeof(string), 200)]
+        [ProducesResponseType(typeof(ErrorResponse), 404)]
+        [SwaggerResponseExample(404, typeof(ErrorResponseExample))]
         public IActionResult DeleteUser(string id)
         {
             var userToRemove = users.FirstOrDefault(u => u.Id == id);

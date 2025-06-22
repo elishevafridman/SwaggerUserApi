@@ -1,76 +1,64 @@
-﻿using Microsoft.AspNetCore.Diagnostics;
-using Swagger_Demo.Models;
-using Swashbuckle.AspNetCore.Annotations;
+﻿using Microsoft.OpenApi.Models;
+using Swagger_Demo.Examples;
+using Swashbuckle.AspNetCore.Filters;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// שירותים ל־API וקונטרולרים
+// הוספת קונטרולרים
 builder.Services.AddControllers();
-builder.Services.AddEndpointsApiExplorer();
 
-// 🟦 Swagger עם תגיות
+// הגדרות Swagger
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("Users", new Microsoft.OpenApi.Models.OpenApiInfo
+    // קבוצה בשם "Users"
+    c.SwaggerDoc("Users", new OpenApiInfo
     {
         Title = "Users API",
         Version = "v1"
     });
 
-    c.EnableAnnotations(); // מאפשר להשתמש ב־[SwaggerOperation]
+    // מאפשר תיעוד עם תגיות ודוגמאות
+    c.EnableAnnotations();       // מאפשר שימוש ב-[SwaggerOperation]
+    c.ExampleFilters();          // מאפשר דוגמאות לקלט/פלט
 });
 
-// 🟦 CORS – פתוח לכל מקור
+// הוספת הדוגמאות מתוך הקבצים שלך
+builder.Services.AddSwaggerExamplesFromAssemblyOf<UserResponseExample>();
+builder.Services.AddSwaggerExamplesFromAssemblyOf<ErrorResponseExample>();
+
+// הוספת CORS אם צריך
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
         policy.AllowAnyOrigin()
-              .AllowAnyHeader()
-              .AllowAnyMethod();
+              .AllowAnyMethod()
+              .AllowAnyHeader();
     });
 });
 
 var app = builder.Build();
 
-// 🟦 טיפול חריגות גלובלי
-app.UseExceptionHandler(errorApp =>
-{
-    errorApp.Run(async context =>
-    {
-        context.Response.ContentType = "application/json";
-        var exception = context.Features.Get<IExceptionHandlerFeature>()?.Error;
-
-        var response = new ErrorResponse
-        {
-            StatusCode = 500,
-            Message = "An unexpected error occurred",
-#if DEBUG
-            Details = exception?.Message
-#endif
-        };
-
-        context.Response.StatusCode = 500;
-        await context.Response.WriteAsJsonAsync(response);
-    });
-});
-
-// 🟦 הפעלת CORS
+// Middleware של CORS
 app.UseCors();
 
-// 🟦 Swagger רק בפיתוח
-if (app.Environment.IsDevelopment())
+// Middleware של Swagger
+app.UseSwagger();
+app.UseSwaggerUI(c =>
 {
-    app.UseSwagger();
+    c.SwaggerEndpoint("/swagger/Users/swagger.json", "Users API");
+});
 
-    app.UseSwaggerUI(c =>
-    {
-        // קישור למסמך שנוצר עבור קבוצת Users
-        c.SwaggerEndpoint("/swagger/Users/swagger.json", "Users API");
-    });
-}
-
+// Middleware של HTTPS
 app.UseHttpsRedirection();
+
+// Middleware של הרשאות
 app.UseAuthorization();
+
+// Middleware של טיפול בשגיאות
+app.UseExceptionHandler("/error"); // אם יש לך ErrorController, או אפשרות ל־Middleware פנימי
+
+// ניתוב לקונטרולרים
 app.MapControllers();
+
 app.Run();
