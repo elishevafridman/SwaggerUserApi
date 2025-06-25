@@ -3,6 +3,8 @@ using System.Reflection;
 
 using Microsoft.OpenApi.Models;
 using Swagger_Demo.Examples;
+using Swagger_Demo.Models;
+using Swagger_Demo.Models.Exceptions;
 using Swashbuckle.AspNetCore.Filters;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -43,7 +45,9 @@ builder.Services.AddSwaggerGen(c =>
 
 
 builder.Services.AddSwaggerExamplesFromAssemblyOf<UserResponseExample>();
-builder.Services.AddSwaggerExamplesFromAssemblyOf<ErrorResponseExample>();
+builder.Services.AddSwaggerExamplesFromAssemblyOf<BadRequestErrorResponseExample>();
+builder.Services.AddSwaggerExamplesFromAssemblyOf<NotFoundErrorResponseExample>();
+
 
 builder.Services.AddCors(options =>
 {
@@ -69,6 +73,34 @@ app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
     c.SwaggerEndpoint("/swagger/Users/swagger.json", "Users API");
+});
+app.Use(async (context, next) =>
+{
+    try
+    {
+        await next();
+    }
+    catch (Exception ex)
+    {
+        var response = context.Response;
+        response.ContentType = "application/json";
+
+        int statusCode = ex switch
+        {
+            ApiException apiEx => apiEx.StatusCode,
+            _ => 500
+        };
+
+        var error = new ErrorResponse
+        {
+            StatusCode = statusCode,
+            Message = ex.Message,
+            Details = ex.InnerException?.Message
+        };
+
+        response.StatusCode = statusCode;
+        await response.WriteAsJsonAsync(error);
+    }
 });
 
 // Middleware של HTTPS

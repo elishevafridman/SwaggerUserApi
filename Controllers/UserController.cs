@@ -1,99 +1,95 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using Swagger_Demo.Models;
 using Swagger_Demo.Examples;
+using Swagger_Demo.Models;
+using Swagger_Demo.Models.Exceptions;
 using Swashbuckle.AspNetCore.Annotations;
 using Swashbuckle.AspNetCore.Filters;
 
-namespace Swagger_Demo.Controllers
+namespace Swagger_Demo.Controllers;
+
+[ApiController]
+[Route("[controller]")]
+[ApiExplorerSettings(GroupName = "Users")]
+public class UserController : ControllerBase
 {
-    [ApiExplorerSettings(GroupName = "Users")]
-    [ApiController]
-    [Route("[controller]")]
-    public class UserController : ControllerBase
+    private static readonly List<StoredUser> users = new();
+
+    [HttpPost]
+    [SwaggerOperation(Summary = "Create a new user")]
+    [ProducesResponseType(typeof(UserResponse), 200)]
+    [ProducesResponseType(typeof(ErrorResponse), 400)]
+    [SwaggerResponseExample(400, typeof(BadRequestErrorResponseExample))]
+    public IActionResult CreateUser([FromBody] User user)
     {
-        private static readonly List<StoredUser> users = new();
+        if (!ModelState.IsValid)
+            throw new BadRequestException("Invalid user data");
 
-        // POST: Create new user
-        [HttpPost]
-        [SwaggerOperation(Summary = "Create a new user", Tags = new[] { "Users" })]
-        [ProducesResponseType(typeof(UserResponse), 200)]
-        [SwaggerResponseExample(200, typeof(UserResponseExample))]
-        [ProducesResponseType(typeof(ErrorResponse), 400)]
-        [SwaggerResponseExample(400, typeof(ErrorResponseExample))]
-        public IActionResult CreateUser([FromBody] User user)
+        if (users.Any(u => u.Email.Equals(user.Email, StringComparison.OrdinalIgnoreCase)))
+            throw new BadRequestException($"User with email '{user.Email}' already exists");
+
+        var newUser = new StoredUser
         {
-            if (!ModelState.IsValid)
-                throw new Exception("Invalid user input");
+            Id = Guid.NewGuid().ToString(),
+            Name = user.Name,
+            Email = user.Email
+        };
 
-            if (users.Any(u => u.Email.Equals(user.Email, StringComparison.OrdinalIgnoreCase)))
-                throw new Exception($"User with email '{user.Email}' already exists");
+        users.Add(newUser);
 
-            var newUser = new StoredUser
-            {
-                Id = Guid.NewGuid().ToString(),
-                Name = user.Name,
-                Email = user.Email
-            };
-
-            users.Add(newUser);
-
-            return Ok(new UserResponse
-            {
-                Id = newUser.Id,
-                Message = $"User {user.Name} created successfully"
-            });
-        }
-
-        // GET: Get all users
-        [HttpGet]
-        [SwaggerOperation(Summary = "Get all users", Tags = new[] { "Users" })]
-        [ProducesResponseType(typeof(IEnumerable<StoredUser>), 200)]
-        [SwaggerResponseExample(200, typeof(UserListExample))]
-        public IActionResult GetUsers()
+        var response = new UserResponse
         {
-            return Ok(users);
-        }
+            Id = newUser.Id,
+            Message = $"User {user.Name} created successfully"
+        };
 
-        // PUT: Update user by ID
-        [HttpPut("{id}")]
-        [SwaggerOperation(Summary = "Update user by ID", Tags = new[] { "Users" })]
-        [ProducesResponseType(typeof(string), 200)]
-        [ProducesResponseType(typeof(ErrorResponse), 400)]
-        [SwaggerResponseExample(400, typeof(ErrorResponseExample))]
-        [ProducesResponseType(typeof(ErrorResponse), 404)]
-        [SwaggerResponseExample(404, typeof(ErrorResponseExample))]
-        public IActionResult UpdateUser(string id, [FromBody] User user)
-        {
-            if (!ModelState.IsValid)
-                throw new Exception("Invalid user input");
+        return Ok(response);
+    }
 
-            var existingUser = users.FirstOrDefault(u => u.Id == id);
-            if (existingUser == null)
-                throw new Exception($"User with ID '{id}' not found");
+    [HttpGet]
+    [SwaggerOperation(Summary = "Get all users")]
+    [ProducesResponseType(typeof(IEnumerable<StoredUser>), 200)]
+    public IActionResult GetUsers()
+    {
+        return Ok(users);
+    }
 
-            if (users.Any(u => u.Email.Equals(user.Email, StringComparison.OrdinalIgnoreCase) && u.Id != id))
-                throw new Exception($"Another user with email '{user.Email}' already exists");
+    [HttpPut("{id}")]
+    [SwaggerOperation(Summary = "Update user by ID")]
+    [ProducesResponseType(typeof(string), 200)]
+    [ProducesResponseType(typeof(ErrorResponse), 400)]
+    [ProducesResponseType(typeof(ErrorResponse), 404)]
+    [SwaggerResponseExample(400, typeof(BadRequestErrorResponseExample))]
+    [SwaggerResponseExample(404, typeof(NotFoundErrorResponseExample))]
+    public IActionResult UpdateUser(string id, [FromBody] User user)
+    {
+        if (!ModelState.IsValid)
+            throw new BadRequestException("Invalid user data");
 
-            existingUser.Name = user.Name;
-            existingUser.Email = user.Email;
+        var existingUser = users.FirstOrDefault(u => u.Id == id);
+        if (existingUser == null)
+            throw new NotFoundException($"User with ID {id} not found");
 
-            return Ok($"User {id} updated successfully");
-        }
+        if (users.Any(u => u.Email.Equals(user.Email, StringComparison.OrdinalIgnoreCase) && u.Id != id))
+            throw new BadRequestException($"Another user with email '{user.Email}' already exists");
 
-        // DELETE: Delete user by ID
-        [HttpDelete("{id}")]
-        [SwaggerOperation(Summary = "Delete user by ID", Tags = new[] { "Users" })]
-        [ProducesResponseType(typeof(string), 200)]
-        [ProducesResponseType(typeof(ErrorResponse), 404)]
-        [SwaggerResponseExample(404, typeof(ErrorResponseExample))]
-        public IActionResult DeleteUser(string id)
-        {
-            var userToRemove = users.FirstOrDefault(u => u.Id == id);
-            if (userToRemove == null)
-                throw new Exception($"User with ID '{id}' not found");
+        existingUser.Name = user.Name;
+        existingUser.Email = user.Email;
 
-            users.Remove(userToRemove);
-            return Ok($"User {id} deleted successfully");
-        }
+        return Ok($"User {id} updated successfully");
+    }
+
+    [HttpDelete("{id}")]
+    [SwaggerOperation(Summary = "Delete user by ID")]
+    [ProducesResponseType(typeof(string), 200)]
+    [ProducesResponseType(typeof(ErrorResponse), 404)]
+    [SwaggerResponseExample(404, typeof(NotFoundErrorResponseExample))]
+    public IActionResult DeleteUser(string id)
+    {
+        var userToRemove = users.FirstOrDefault(u => u.Id == id);
+        if (userToRemove == null)
+            throw new NotFoundException($"User with ID {id} not found");
+
+        users.Remove(userToRemove);
+        return Ok($"User {id} deleted successfully");
     }
 }
